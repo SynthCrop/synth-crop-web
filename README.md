@@ -32,7 +32,7 @@ deploy/                Streamlit app (reads artifacts only)
 
 ```bash
 git clone <this-repo>
-cd crop-classification-web
+cd synth-crop-web
 python -m venv .venv && source .venv/bin/activate
 pip install -r deploy/requirements.txt
 
