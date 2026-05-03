@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.python-version
+
+# Notebooks
+.ipynb_checkpoints/
+*.ipynb.bak*
+
+# Built artifacts (rebuild via prepare_artifacts.py)
+deploy/artifacts/*
+!deploy/artifacts/.gitkeep
+
+# Heavy raw data (out of repo entirely)
+*.csv
+*.parquet
+*.zip
+*.tif
+*.tiff
+*.SAFE/
+*.SAFE.zip
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+data/
+full_dataset/
+rayong_raster/
+synthetic/
+
+# Model checkpoints (>50 MB) — release-asset only
+*.pt
+*.pth
+*.joblib
+*.pkl
+*.npz
+*.npy
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Logs
+*.log

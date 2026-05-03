@@ -1,0 +1,8 @@
+-r deploy/requirements.txt
+
+# extra deps used only by prepare_artifacts.py and notebooks
+torch>=2.0
+optuna>=3.4
+tqdm>=4.66
+ipykernel>=6.27
+jupyter>=1.0
