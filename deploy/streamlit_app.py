@@ -36,14 +36,20 @@ c3.metric("classes (palette)", "15")
 c4.metric("pred rasters",     str(status["n_rasters"]))
 
 if status["missing"]:
-    missing_names = ", ".join(status["missing"])
     st.error(
-        f"`{artifacts_dir()}/{missing_names}` missing — "
-        "run `prepare_artifacts.py` first"
+        f"required artifacts missing: `{', '.join(status['missing'])}` — "
+        "run `python prepare_artifacts.py` to populate "
+        f"`{artifacts_dir()}`"
     )
+elif status["optional_missing"]:
     st.info(
-        "Run `python prepare_artifacts.py` to populate `deploy/artifacts/`."
+        f"optional artifacts not present: "
+        f"`{', '.join(status['optional_missing'])}`. "
+        "Synth comparison + segmentation rasters need them; "
+        "pass `--synth-csv` and `--meta-json` to `prepare_artifacts.py`."
     )
+else:
+    st.success("all artifacts present")
 
 with st.expander("artifact paths"):
     st.code(str(artifacts_dir()))

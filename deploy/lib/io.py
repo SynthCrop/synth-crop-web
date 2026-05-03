@@ -13,17 +13,24 @@ import streamlit as st
 
 ARTIFACTS_SUBDIR = "artifacts"
 
-EXPECTED_FILES = [
+REQUIRED_FILES = [
     "dataset.parquet",
-    "synth_tabsyn.parquet",
     "class_counts.parquet",
     "feature_stats.parquet",
+    "corr_real.npy",
     "metrics.json",
     "confusion.npy",
     "feature_importance.parquet",
     "rf_model.joblib",
+]
+
+OPTIONAL_FILES = [
+    "synth_tabsyn.parquet",
+    "corr_syn.npy",
     "grid_meta.json",
 ]
+
+EXPECTED_FILES = REQUIRED_FILES + OPTIONAL_FILES
 
 
 def artifacts_dir() -> Path:
@@ -32,10 +39,15 @@ def artifacts_dir() -> Path:
 
 
 def artifact_status() -> dict[str, Any]:
-    """Quick scan of artifacts/. Used by the home page banner."""
+    """Quick scan of artifacts/. Used by the home page banner.
+
+    `missing` lists only REQUIRED files. Optional files are reported in
+    `optional_missing` and never trigger the banner.
+    """
     d = artifacts_dir()
     files = {name: (d / name).exists() for name in EXPECTED_FILES}
-    missing = [n for n, ok in files.items() if not ok]
+    missing = [n for n in REQUIRED_FILES if not files[n]]
+    optional_missing = [n for n in OPTIONAL_FILES if not files[n]]
 
     rows = 0
     years: list[int] = []
@@ -56,6 +68,7 @@ def artifact_status() -> dict[str, Any]:
     return {
         "files": files,
         "missing": missing,
+        "optional_missing": optional_missing,
         "rows": rows,
         "years": years,
         "n_rasters": n_rasters,
