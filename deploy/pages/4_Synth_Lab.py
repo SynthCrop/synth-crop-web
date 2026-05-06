@@ -47,18 +47,26 @@ FEATURE_COLS = [
 ]
 
 
+def _normalize_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Map upstream `mndwi *` columns onto the canonical `ndwi *` schema."""
+    rename = {c: c.replace("mndwi", "ndwi")
+              for c in df.columns if c.startswith("mndwi")}
+    return df.rename(columns=rename) if rename else df
+
+
 @st.cache_data(show_spinner=False)
 def _load_real() -> pd.DataFrame:
-    df = load_parquet("dataset.parquet").copy()
+    df = _normalize_features(load_parquet("dataset.parquet")).copy()
     df["label"] = to_dense(df["label"].to_numpy())
-    return df[df["label"] >= 0][FEATURE_COLS + ["label"]].reset_index(drop=True)
+    keep = [c for c in FEATURE_COLS + ["label"] if c in df.columns]
+    return df[df["label"] >= 0][keep].reset_index(drop=True)
 
 
 @st.cache_data(show_spinner=False)
 def _load_synth(name: str) -> pd.DataFrame | None:
     if not status["files"].get(name):
         return None
-    df = load_parquet(name).copy()
+    df = _normalize_features(load_parquet(name)).copy()
     df["label"] = to_dense(df["label"].to_numpy())
     keep = [c for c in FEATURE_COLS + ["label"] if c in df.columns]
     return df[keep][df["label"] >= 0].reset_index(drop=True)
@@ -67,6 +75,14 @@ def _load_synth(name: str) -> pd.DataFrame | None:
 real  = _load_real()
 smote = _load_synth("synth_smote.parquet")
 tabsyn = _load_synth("synth_tabsyn.parquet")
+
+# Use the intersection of FEATURE_COLS actually present across loaded sources,
+# so downstream code never references a missing column.
+_present = set(real.columns)
+for d in (smote, tabsyn):
+    if d is not None:
+        _present &= set(d.columns)
+FEATURE_COLS = [c for c in FEATURE_COLS if c in _present]
 
 if smote is None and tabsyn is None:
     st.error(
@@ -330,6 +346,7 @@ with tab_corr:
     if corr_real is None:
         st.error("`corr_real.npy` missing.")
     else:
+        N_REAL = corr_real.shape[0]
         cols = st.columns(2)
         for slot, name, fname in [(cols[0], "SMOTE", "corr_smote.npy"),
                                     (cols[1], "TabSyn", "corr_syn.npy")]:
@@ -337,6 +354,18 @@ with tab_corr:
                 slot.info(f"`{fname}` missing — skip {name}.")
                 continue
             arr = load_npy(fname)
+            if arr.shape != corr_real.shape:
+                # Synth correlation may include extra delta features. Crop to
+                # the leading N_REAL × N_REAL block, which holds the same base
+                # features in matching order.
+                if arr.shape[0] >= N_REAL and arr.shape[1] >= N_REAL:
+                    arr = arr[:N_REAL, :N_REAL]
+                else:
+                    slot.warning(
+                        f"`{fname}` shape {arr.shape} smaller than "
+                        f"`corr_real.npy` {corr_real.shape}; skipping {name}."
+                    )
+                    continue
             delta = np.abs(arr - corr_real)
             fig = go.Figure(data=go.Heatmap(
                 z=delta, x=FEATURE_COLS, y=FEATURE_COLS,

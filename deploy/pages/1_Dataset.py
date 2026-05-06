@@ -229,6 +229,16 @@ def corr_fig(matrix: np.ndarray, title: str) -> go.Figure:
 
 
 if corr_syn is not None:
+    if corr_syn.shape != corr_real.shape:
+        # Synth correlation may include extra delta features. Crop to the
+        # leading block matching the real correlation, which holds the same
+        # base features in the same order.
+        n = corr_real.shape[0]
+        if corr_syn.shape[0] >= n and corr_syn.shape[1] >= n:
+            corr_syn = corr_syn[:n, :n]
+        else:
+            corr_syn = None
+if corr_syn is not None:
     cc1, cc2 = st.columns(2)
     cc1.plotly_chart(corr_fig(corr_real, "real"), use_container_width=True)
     cc2.plotly_chart(corr_fig(corr_syn,  "synthetic"), use_container_width=True)

@@ -26,9 +26,6 @@ venv/
 *.prj
 *.cpg
 data/
-full_dataset/
-rayong_raster/
-synthetic/
 
 # Model checkpoints (>50 MB) — release-asset only
 *.pt

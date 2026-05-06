@@ -107,7 +107,14 @@ def load_parquet(name: str):
 
 @st.cache_data(show_spinner=False)
 def load_json(name: str) -> dict:
-    return json.loads((artifacts_dir() / name).read_text())
+    raw = (artifacts_dir() / name).read_bytes()
+    for enc in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+        try:
+            return json.loads(raw.decode(enc))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+    # Last resort: replace undecodable bytes so the page can still load.
+    return json.loads(raw.decode("utf-8", errors="replace"))
 
 
 @st.cache_data(show_spinner=False)
