@@ -21,7 +21,6 @@ venv/
 *.tiff
 *.SAFE/
 *.SAFE.zip
-*.shp
 *.shx
 *.dbf
 *.prj
@@ -36,8 +35,6 @@ synthetic/
 *.pth
 *.joblib
 *.pkl
-*.npz
-*.npy
 
 # OS / editor
 .DS_Store
