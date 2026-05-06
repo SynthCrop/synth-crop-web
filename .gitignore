@@ -11,12 +11,11 @@ venv/
 *.ipynb.bak*
 
 # Built artifacts (rebuild via prepare_artifacts.py)
-deploy/artifacts/*
+# deploy/artifacts/*
 !deploy/artifacts/.gitkeep
 
+./prepare_artifacts.py
 # Heavy raw data (out of repo entirely)
-*.csv
-*.parquet
 *.zip
 *.tif
 *.tiff
@@ -48,6 +47,9 @@ synthetic/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local agent settings
+.claude/
 
 # Logs
 *.log

@@ -1,60 +1,292 @@
 """Crop classification — TabSyn x Random Forest. Streamlit entry point."""
 from __future__ import annotations
-from pathlib import Path
 
 import streamlit as st
 
 from lib.io import artifacts_dir, artifact_status
 
 st.set_page_config(
-    page_title="Crop classification — TabSyn x Random Forest",
+    page_title="Crop Classification — TabSyn x Random Forest",
     page_icon=":seedling:",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-st.title(":seedling: Crop classification — TabSyn x Random Forest")
-
+# ----------------------------------------------------------------------------
+# Custom styling for the landing page
+# ----------------------------------------------------------------------------
 st.markdown(
     """
-    **Pages**
+    <style>
+      :root {
+        --accent: #2ca02c;
+        --accent-soft: rgba(44, 160, 44, 0.12);
+        --border: rgba(255, 255, 255, 0.10);
+        --muted: rgba(230, 230, 230, 0.62);
+      }
+      .hero {
+        padding: 28px 32px;
+        margin-bottom: 24px;
+        border-radius: 14px;
+        background: linear-gradient(135deg,
+            rgba(44, 160, 44, 0.18) 0%,
+            rgba(31, 119, 180, 0.18) 100%);
+        border: 1px solid var(--border);
+      }
+      .hero .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .hero h1 { margin: 0; font-size: 30px; line-height: 1.2; }
+      .hero .tagline {
+        margin-top: 8px;
+        font-size: 16px;
+        color: var(--muted);
+        max-width: 880px;
+      }
+      .hero-stats {
+        display: flex; flex-wrap: wrap; gap: 8px 16px;
+        margin-top: 16px;
+      }
+      .hero-stats .pill {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .hero-stats .pill b { color: #fff; font-weight: 600; }
 
-    - :bar_chart: **Dataset** — class distribution, feature stats, correlations
-    - :earth_africa: **Temporal Change** — year-to-year class transitions, Sankey flows, change maps
-    - :sparkles: **Segmentation** — predicted-class rasters layered on a basemap
-    - :dart: **Predict** — interactive classifier (single pixel + batch CSV)
-    - :clipboard: **Model Card** — metrics, per-class F1, hyperparameters
-    """
+      .card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 14px;
+      }
+      .nav-card {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px;
+        transition: border-color 0.15s, transform 0.15s;
+      }
+      .nav-card:hover {
+        border-color: rgba(44, 160, 44, 0.5);
+        transform: translateY(-1px);
+      }
+      .nav-card .num {
+        display: inline-block;
+        width: 22px; height: 22px; line-height: 22px; text-align: center;
+        background: var(--accent-soft); color: var(--accent);
+        border-radius: 6px; font-size: 12px; font-weight: 700;
+        margin-right: 8px;
+      }
+      .nav-card .title { font-size: 16px; font-weight: 600; }
+      .nav-card .desc {
+        margin-top: 6px;
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      .nav-card .reads {
+        margin-top: 10px; font-size: 11px;
+        color: rgba(230, 230, 230, 0.45);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+      .tag {
+        font-size: 11px; padding: 3px 10px; border-radius: 999px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+
+      .section-h {
+        font-size: 12px; text-transform: uppercase;
+        letter-spacing: 0.16em; color: var(--muted);
+        margin: 28px 0 10px 0;
+      }
+
+      .pipeline {
+        background: rgba(0,0,0,0.18);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px 18px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        line-height: 1.7;
+        color: rgba(230,230,230,0.85);
+        white-space: pre;
+        overflow-x: auto;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
+# ----------------------------------------------------------------------------
+# Status snapshot
+# ----------------------------------------------------------------------------
 status = artifact_status()
+years_str = ", ".join(map(str, status["years"])) if status["years"] else "—"
+pred_years_str = ", ".join(map(str, status["pred_years"])) if status["pred_years"] else "—"
 
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("rows in dataset", f"{status['rows']:,}" if status["rows"] else "—")
-c2.metric("years",            ", ".join(map(str, status["years"])) if status["years"] else "—")
-c3.metric("classes (palette)", "15")
-c4.metric("pred rasters",     str(status["n_rasters"]))
+# ----------------------------------------------------------------------------
+# Hero
+# ----------------------------------------------------------------------------
+st.markdown(
+    f"""
+    <div class="hero">
+      <div class="eyebrow">synth-crop-web · Rayong AOI</div>
+      <h1>🌱 Crop Classification — TabSyn × Random Forest</h1>
+      <div class="tagline">
+        Per-pixel classification of 14 tropical crops + reservoirs from Sentinel-2
+        L2A composites and LDD landuse polygons. A two-stage Random Forest cascade
+        is augmented with synthetic minority samples generated by TabSyn (latent
+        diffusion over a VAE) and SMOTE.
+      </div>
+      <div class="hero-stats">
+        <span class="pill"><b>15</b> classes</span>
+        <span class="pill"><b>{status['rows']:,}</b> sampled rows</span>
+        <span class="pill">years <b>{years_str}</b></span>
+        <span class="pill">native grid <b>6 654 × 9 178 @ 10 m</b></span>
+        <span class="pill">CRS <b>EPSG:32647</b></span>
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
+# ----------------------------------------------------------------------------
+# Artifact status banner
+# ----------------------------------------------------------------------------
 if status["missing"]:
     st.error(
-        f"required artifacts missing: `{', '.join(status['missing'])}` — "
-        "run `python prepare_artifacts.py` to populate "
-        f"`{artifacts_dir()}`"
+        f"Required artifacts missing: `{', '.join(status['missing'])}`. "
+        f"Run `python prepare_artifacts.py` to populate `{artifacts_dir()}`."
     )
 elif status["optional_missing"]:
     st.info(
-        f"optional artifacts not present: "
-        f"`{', '.join(status['optional_missing'])}`. "
-        "Synth comparison + segmentation rasters need them; "
-        "pass `--synth-csv` and `--meta-json` to `prepare_artifacts.py`."
+        f"All required artifacts present. Optional artifacts not built: "
+        f"`{', '.join(status['optional_missing'])}` — pages that depend on "
+        "them fall back gracefully."
     )
 else:
-    st.success("all artifacts present")
+    st.success("All artifacts present.")
 
-with st.expander("artifact paths"):
+# ----------------------------------------------------------------------------
+# KPI strip
+# ----------------------------------------------------------------------------
+k1, k2, k3, k4 = st.columns(4)
+k1.metric("rows in dataset",    f"{status['rows']:,}" if status["rows"] else "—")
+k2.metric("dataset years",      years_str)
+k3.metric("classes",            "15")
+k4.metric("prediction years",   pred_years_str)
+
+# ----------------------------------------------------------------------------
+# Page navigation
+# ----------------------------------------------------------------------------
+st.markdown('<div class="section-h">Explore</div>', unsafe_allow_html=True)
+
+PAGES: list[tuple[str, str, str, str, str]] = [
+    ("1", "📊", "Dataset",
+     "Class distribution, per-feature statistics, real-vs-synth feature correlation.",
+     "dataset.parquet · class_counts.parquet · corr_real.npy"),
+    ("2", "🌍", "Temporal Change",
+     "Per-year LDD landuse polygons over a folium basemap, colored by category.",
+     "<year>/LU_RYG_<thai>.shp"),
+    ("3", "✨", "Segmentation",
+     "Interactive RF cascade prediction vs ground-truth raster, with optional Sentinel-2 basemap.",
+     "preds_<year>.parquet · grid_meta.json · basemap_<year>.jpg"),
+    ("4", "🧪", "Synth Lab",
+     "TabSyn / SMOTE quality — class lift, marginal distributions, PCA, Wasserstein, correlation drift.",
+     "synth_tabsyn.parquet · synth_smote.parquet · corr_*"),
+    ("5", "📋", "Model Card",
+     "Hyperparameters, per-class F1, confusion matrix, feature importance.",
+     "metrics.json · confusion.npy · feature_importance.parquet"),
+]
+
+cards_html = '<div class="card-grid">'
+for num, icon, title, desc, reads in PAGES:
+    cards_html += (
+        f'<div class="nav-card">'
+        f'  <div><span class="num">{num}</span>'
+        f'    <span class="title">{icon} {title}</span></div>'
+        f'  <div class="desc">{desc}</div>'
+        f'  <div class="reads">{reads}</div>'
+        f'</div>'
+    )
+cards_html += '</div>'
+st.markdown(cards_html, unsafe_allow_html=True)
+st.caption("Open any page from the sidebar.")
+
+# ----------------------------------------------------------------------------
+# Pipeline + tech stack
+# ----------------------------------------------------------------------------
+left, right = st.columns([3, 2])
+
+with left:
+    st.markdown('<div class="section-h">Pipeline</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+<div class="pipeline">Sentinel-2 SAFE.zip ─┐
+LDD shapefile (LU_RYG) ──┼──► rayong_rf_cascade.ipynb ──► preprocess_dataset.parquet
+                                                       ──► rf_model.joblib (cascade)
+                                                       ──► preds_&lt;year&gt;.parquet
+
+preprocess_dataset.parquet ──► crop_tabsyn.ipynb       ──► synth_tabsyn.parquet
+                            ──► crop_smote_rf.ipynb    ──► synth_smote.parquet
+
+artifacts ──► prepare_artifacts.py ──► deploy/artifacts/  ◄── streamlit app</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with right:
+    st.markdown('<div class="section-h">Stack</div>', unsafe_allow_html=True)
+    tags = [
+        "Streamlit", "scikit-learn", "imblearn (SMOTE)", "TabSyn",
+        "Sentinel-2 L2A", "rasterio", "geopandas", "folium", "plotly",
+    ]
+    st.markdown(
+        '<div class="tag-row">'
+        + "".join(f'<span class="tag">{t}</span>' for t in tags)
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="section-h">Class palette</div>', unsafe_allow_html=True)
+    from lib.palette import CLASSES, PALETTE_HEX, LDD_CODES
+    palette_html = '<div class="tag-row" style="gap:4px;">' + "".join(
+        f'<span class="tag" style="border-color:{c}; color:#fff;">'
+        f'<span style="display:inline-block;width:9px;height:9px;'
+        f'background:{c};border-radius:2px;margin-right:5px;"></span>'
+        f'{name} <span style="color:rgba(230,230,230,0.5);">·{ldd}</span>'
+        f'</span>'
+        for c, name, ldd in zip(PALETTE_HEX, CLASSES, LDD_CODES)
+    ) + '</div>'
+    st.markdown(palette_html, unsafe_allow_html=True)
+
+# ----------------------------------------------------------------------------
+# Footer / artifact details (collapsed)
+# ----------------------------------------------------------------------------
+with st.expander("Artifact inventory"):
     st.code(str(artifacts_dir()))
-    for name, ok in status["files"].items():
-        icon = ":white_check_mark:" if ok else ":x:"
-        st.write(f"{icon} `{name}`")
+    cols = st.columns(2)
+    files_list = list(status["files"].items())
+    half = (len(files_list) + 1) // 2
+    for slot, group in zip(cols, [files_list[:half], files_list[half:]]):
+        for name, ok in group:
+            icon = "✅" if ok else "❌"
+            slot.write(f"{icon} `{name}`")
+    st.caption(
+        f"pred parquets: **{status['n_pred_pq']}**  •  "
+        f"pred GeoTIFFs: **{status['n_rasters']}**  •  "
+        f"distinct pred years: **{status['n_pred_years']}**"
+    )
 
-st.caption("navigate via the sidebar →")
+st.caption("Navigate via the sidebar →   ·   Source: see repository README.")

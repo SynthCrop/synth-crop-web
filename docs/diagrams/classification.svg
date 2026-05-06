@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 700" font-family="Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+    <style>
+      .input  { fill:#fff7e6; stroke:#d97706; stroke-width:1.5; }
+      .stage1 { fill:#dbeafe; stroke:#1d4ed8; stroke-width:2; }
+      .stage2 { fill:#fef9c3; stroke:#a16207; stroke-width:2; }
+      .merge  { fill:#ede9fe; stroke:#6d28d9; stroke-width:1.5; }
+      .out    { fill:#dcfce7; stroke:#15803d; stroke-width:2; }
+      .meta   { fill:#f5f5f4; stroke:#78716c; stroke-width:1; }
+      .title  { font-size:18px; font-weight:bold; fill:#1f2937; }
+      .label  { font-size:13px; fill:#1f2937; }
+      .bold   { font-size:13px; font-weight:bold; fill:#1f2937; }
+      .small  { font-size:11px; fill:#52525b; }
+      .arrow  { stroke:#444; stroke-width:1.5; fill:none; marker-end:url(#arrow2); }
+      .branch { stroke:#a16207; stroke-width:2; fill:none; marker-end:url(#arrow2); stroke-dasharray:5,3; }
+    </style>
+  </defs>
+
+  <text x="20" y="30" class="title">Classification — 2-stage Random Forest cascade</text>
+
+  <!-- Input parquet -->
+  <rect x="20" y="60" width="220" height="80" rx="8" class="input"/>
+  <text x="130" y="84" text-anchor="middle" class="bold">baseline_dataset.parquet</text>
+  <text x="130" y="102" text-anchor="middle" class="small">~7 M labeled pixels</text>
+  <text x="130" y="118" text-anchor="middle" class="small">15 base features + label + parcel_id</text>
+  <text x="130" y="132" text-anchor="middle" class="small">+ year, row, col, n_valid_months</text>
+
+  <!-- Feature engineering -->
+  <rect x="280" y="60" width="220" height="80" rx="6" class="input"/>
+  <text x="390" y="84" text-anchor="middle" class="bold">Feature engineering</text>
+  <text x="390" y="102" text-anchor="middle" class="small">+ 10 temporal deltas</text>
+  <text x="390" y="118" text-anchor="middle" class="small">(d11_10, d12_11 per index)</text>
+  <text x="390" y="132" text-anchor="middle" class="small">25 features total</text>
+
+  <!-- Per-class cap -->
+  <rect x="540" y="60" width="220" height="80" rx="6" class="input"/>
+  <text x="650" y="84" text-anchor="middle" class="bold">Per-class cap</text>
+  <text x="650" y="102" text-anchor="middle" class="small">DEFAULT_CAP = 400,000 px</text>
+  <text x="650" y="118" text-anchor="middle" class="small">subsample majorities</text>
+  <text x="650" y="132" text-anchor="middle" class="small">keep minorities full</text>
+
+  <!-- Pixel-strat split -->
+  <rect x="800" y="60" width="220" height="80" rx="6" class="input"/>
+  <text x="910" y="84" text-anchor="middle" class="bold">Pixel-stratified 80/10/10</text>
+  <text x="910" y="102" text-anchor="middle" class="small">train_test_split(stratify=y)</text>
+  <text x="910" y="118" text-anchor="middle" class="small">SEED=42</text>
+  <text x="910" y="132" text-anchor="middle" class="small">train | val | test</text>
+
+  <!-- Stage 1 -->
+  <rect x="60" y="200" width="320" height="160" rx="10" class="stage1"/>
+  <text x="220" y="226" text-anchor="middle" class="bold" font-size="15">Stage 1 — base RF (15 classes)</text>
+  <text x="220" y="248" text-anchor="middle" class="small">trained on full 15-class problem</text>
+  <text x="220" y="266" text-anchor="middle" class="small">RandomForestClassifier(</text>
+  <text x="220" y="282" text-anchor="middle" class="small">  n_estimators=300, max_depth=36,</text>
+  <text x="220" y="298" text-anchor="middle" class="small">  min_samples_split=5, max_features='log2',</text>
+  <text x="220" y="314" text-anchor="middle" class="small">  class_weight='balanced_subsample',</text>
+  <text x="220" y="330" text-anchor="middle" class="small">  bootstrap=True, random_state=42)</text>
+  <text x="220" y="350" text-anchor="middle" class="bold">→ pred_stage1 (one of 15 classes)</text>
+
+  <!-- Decision -->
+  <polygon points="450,260 540,300 450,340 360,300" fill="#fef3c7" stroke="#a16207" stroke-width="1.5"/>
+  <text x="450" y="295" text-anchor="middle" class="bold">pred ∈</text>
+  <text x="450" y="312" text-anchor="middle" class="small">TROPICAL_ORCHARDS?</text>
+
+  <!-- Stage 2 -->
+  <rect x="610" y="200" width="350" height="180" rx="10" class="stage2"/>
+  <text x="785" y="226" text-anchor="middle" class="bold" font-size="15">Stage 2 — orchard specialist (8 classes)</text>
+  <text x="785" y="248" text-anchor="middle" class="small">trained on tropical-orchard pixels only</text>
+  <text x="785" y="266" text-anchor="middle" class="small">2403 Durian | 2404 Rambutan | 2405 Coconut</text>
+  <text x="785" y="282" text-anchor="middle" class="small">2407 Mango | 2413 Longan | 2416 Jackfruit</text>
+  <text x="785" y="298" text-anchor="middle" class="small">2419 Mangosteen | 2420 Langsat</text>
+  <text x="785" y="320" text-anchor="middle" class="small">RF(..., class_weight='balanced')</text>
+  <text x="785" y="338" text-anchor="middle" class="small">focus capacity on confusable cluster</text>
+  <text x="785" y="362" text-anchor="middle" class="bold">→ refined orchard label (overwrite stage-1)</text>
+
+  <!-- Path explanations -->
+  <text x="392" y="195" class="small" fill="#a16207" font-style="italic">no</text>
+  <text x="555" y="295" class="small" fill="#a16207" font-style="italic">yes →</text>
+
+  <!-- Final pixel pred -->
+  <rect x="280" y="430" width="280" height="60" rx="8" class="merge"/>
+  <text x="420" y="452" text-anchor="middle" class="bold">Final pixel prediction</text>
+  <text x="420" y="470" text-anchor="middle" class="small">cascade_predict(X) → 15-class label</text>
+  <text x="420" y="484" text-anchor="middle" class="small">per pixel (pixel-level CM saved)</text>
+
+  <!-- Parcel vote -->
+  <rect x="620" y="430" width="280" height="60" rx="8" class="merge"/>
+  <text x="760" y="452" text-anchor="middle" class="bold">Parcel-vote post-process</text>
+  <text x="760" y="470" text-anchor="middle" class="small">groupby(parcel_id) → mode of preds</text>
+  <text x="760" y="484" text-anchor="middle" class="small">denoised parcel-level CM saved</text>
+
+  <!-- Outputs -->
+  <rect x="60" y="540" width="320" height="120" rx="8" class="out"/>
+  <text x="220" y="564" text-anchor="middle" class="bold">Eval metrics (val + test)</text>
+  <text x="220" y="584" text-anchor="middle" class="small">accuracy, Cohen's kappa</text>
+  <text x="220" y="600" text-anchor="middle" class="small">weighted_F1, macro_F1</text>
+  <text x="220" y="616" text-anchor="middle" class="small">per-class precision / recall / F1</text>
+  <text x="220" y="632" text-anchor="middle" class="small">classification_report</text>
+  <text x="220" y="648" text-anchor="middle" class="small">→ rf_artifacts/ + deploy/artifacts/</text>
+
+  <rect x="420" y="540" width="320" height="120" rx="8" class="out"/>
+  <text x="580" y="564" text-anchor="middle" class="bold">Confusion matrices</text>
+  <text x="580" y="584" text-anchor="middle" class="small">2×2 grid: pixel + parcel-vote</text>
+  <text x="580" y="600" text-anchor="middle" class="small">val (top) + test (bottom)</text>
+  <text x="580" y="616" text-anchor="middle" class="small">row-normalised</text>
+  <text x="580" y="640" text-anchor="middle" class="small">→ cm_combined.png</text>
+
+  <rect x="780" y="540" width="320" height="120" rx="8" class="out"/>
+  <text x="940" y="564" text-anchor="middle" class="bold">Deploy artifacts</text>
+  <text x="940" y="584" text-anchor="middle" class="small">rf_model.joblib (cascade bundle)</text>
+  <text x="940" y="600" text-anchor="middle" class="small">metrics.json + confusion.npy</text>
+  <text x="940" y="616" text-anchor="middle" class="small">feature_importance.parquet</text>
+  <text x="940" y="632" text-anchor="middle" class="small">grid_meta.json + class counts</text>
+  <text x="940" y="648" text-anchor="middle" class="small">→ Streamlit app</text>
+
+  <!-- Arrows top row -->
+  <path d="M240 100 H280" class="arrow"/>
+  <path d="M500 100 H540" class="arrow"/>
+  <path d="M760 100 H800" class="arrow"/>
+
+  <!-- top -> stage1 -->
+  <path d="M910 140 Q910 170 220 200" class="arrow"/>
+
+  <!-- stage1 -> decision -->
+  <path d="M380 290 Q400 290 360 300" class="arrow"/>
+
+  <!-- decision yes -> stage2 -->
+  <path d="M540 300 H610" class="branch"/>
+
+  <!-- decision no -> final pixel pred -->
+  <path d="M450 340 Q450 380 420 430" class="arrow"/>
+  <text x="478" y="395" class="small" fill="#52525b" font-style="italic">non-orchard preds pass through</text>
+
+  <!-- stage 2 -> final -->
+  <path d="M785 380 Q785 410 560 440" class="arrow"/>
+
+  <!-- final -> parcel vote -->
+  <path d="M560 460 H620" class="arrow"/>
+
+  <!-- final -> eval metrics -->
+  <path d="M340 490 Q280 510 220 540" class="arrow"/>
+
+  <!-- final -> CM -->
+  <path d="M420 490 V540" class="arrow"/>
+  <path d="M760 490 V540" class="arrow"/>
+
+  <!-- parcel vote -> deploy -->
+  <path d="M900 490 Q920 510 940 540" class="arrow"/>
+</svg>

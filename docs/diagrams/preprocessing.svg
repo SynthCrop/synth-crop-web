@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 720" font-family="Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+    <style>
+      .input  { fill:#fff7e6; stroke:#d97706; stroke-width:1.5; }
+      .proc   { fill:#e0f2fe; stroke:#0369a1; stroke-width:1.5; }
+      .filter { fill:#fee2e2; stroke:#b91c1c; stroke-width:1.5; }
+      .out    { fill:#dcfce7; stroke:#15803d; stroke-width:2; }
+      .meta   { fill:#f5f5f4; stroke:#78716c; stroke-width:1; }
+      .title  { font-size:18px; font-weight:bold; fill:#1f2937; }
+      .label  { font-size:13px; fill:#1f2937; }
+      .small  { font-size:11px; fill:#52525b; }
+      .arrow  { stroke:#444; stroke-width:1.5; fill:none; marker-end:url(#arrow); }
+    </style>
+  </defs>
+
+  <text x="20" y="30" class="title">Preprocessing pipeline — Sentinel-2 L2A → labeled per-pixel parquet</text>
+
+  <!-- Inputs (left column) -->
+  <g>
+    <rect x="20" y="60" width="220" height="60" rx="6" class="input"/>
+    <text x="130" y="82" text-anchor="middle" class="label" font-weight="bold">Sentinel-2 L2A</text>
+    <text x="130" y="100" text-anchor="middle" class="small">3 years × 3 months (Oct/Nov/Dec)</text>
+    <text x="130" y="114" text-anchor="middle" class="small">7 bands (B02-B11) + SCL cloud mask</text>
+
+    <rect x="20" y="140" width="220" height="60" rx="6" class="input"/>
+    <text x="130" y="162" text-anchor="middle" class="label" font-weight="bold">LDD shapefiles</text>
+    <text x="130" y="180" text-anchor="middle" class="small">LU_RYG_25{61,63,67}.shp</text>
+    <text x="130" y="194" text-anchor="middle" class="small">LU_ID_L3 + LU_CODE + LUL1_CODE</text>
+
+    <rect x="20" y="220" width="220" height="50" rx="6" class="input"/>
+    <text x="130" y="240" text-anchor="middle" class="label" font-weight="bold">LUCODE.xls</text>
+    <text x="130" y="258" text-anchor="middle" class="small">LDD code → name reference</text>
+  </g>
+
+  <!-- AOI grid (top centre) -->
+  <rect x="320" y="60" width="240" height="60" rx="6" class="proc"/>
+  <text x="440" y="82" text-anchor="middle" class="label" font-weight="bold">1. AOI grid</text>
+  <text x="440" y="100" text-anchor="middle" class="small">union of 3-yr bbox ∩ S2 tile T47PQQ</text>
+  <text x="440" y="114" text-anchor="middle" class="small">6654 × 9178 px @ 10m, EPSG:32647</text>
+
+  <!-- Label mapping -->
+  <rect x="320" y="140" width="240" height="80" rx="6" class="filter"/>
+  <text x="440" y="162" text-anchor="middle" class="label" font-weight="bold">2. Label mapping (drop logic)</text>
+  <text x="440" y="180" text-anchor="middle" class="small">drop urban (LUL1='U' / 1xxx)</text>
+  <text x="440" y="194" text-anchor="middle" class="small">drop composite (LU_ID_L3>99999, '/' in code)</text>
+  <text x="440" y="208" text-anchor="middle" class="small">drop NON_TARGET_DROP_CODES (40 codes)</text>
+
+  <!-- Agriculture-only -->
+  <rect x="320" y="240" width="240" height="50" rx="6" class="filter"/>
+  <text x="440" y="260" text-anchor="middle" class="label" font-weight="bold">3. OTHER policy = agriculture_only</text>
+  <text x="440" y="278" text-anchor="middle" class="small">drop F (forest) + M (misc) + non-target W</text>
+
+  <!-- Buffer -->
+  <rect x="320" y="310" width="240" height="60" rx="6" class="proc"/>
+  <text x="440" y="332" text-anchor="middle" class="label" font-weight="bold">4. Adaptive buffer</text>
+  <text x="440" y="350" text-anchor="middle" class="small">parcel ≥ 400 m² → -10m buffer</text>
+  <text x="440" y="364" text-anchor="middle" class="small">parcel &lt; 400 m² → keep original</text>
+
+  <!-- Two-pass rasterise -->
+  <rect x="320" y="390" width="240" height="60" rx="6" class="proc"/>
+  <text x="440" y="412" text-anchor="middle" class="label" font-weight="bold">5. Two-pass rasterise</text>
+  <text x="440" y="430" text-anchor="middle" class="small">pass 1: OTHER (background)</text>
+  <text x="440" y="444" text-anchor="middle" class="small">pass 2: targets (overwrite OTHER)</text>
+
+  <!-- Right column: pixel extract -->
+  <rect x="640" y="60" width="240" height="80" rx="6" class="proc"/>
+  <text x="760" y="82" text-anchor="middle" class="label" font-weight="bold">6. Pixel sampling</text>
+  <text x="760" y="100" text-anchor="middle" class="small">cap 200 px / parcel</text>
+  <text x="760" y="114" text-anchor="middle" class="small">read bands at pixel coords</text>
+  <text x="760" y="128" text-anchor="middle" class="small">SCL cloud mask {1, 8, 9, 10}</text>
+
+  <!-- Indices -->
+  <rect x="640" y="160" width="240" height="100" rx="6" class="proc"/>
+  <text x="760" y="180" text-anchor="middle" class="label" font-weight="bold">7. Vegetation indices</text>
+  <text x="760" y="198" text-anchor="middle" class="small">NDVI, EVI, MNDWI (Xu),</text>
+  <text x="760" y="212" text-anchor="middle" class="small">MTCI (red-edge), SWIR (B11)</text>
+  <text x="760" y="230" text-anchor="middle" class="small">5 indices × 3 months</text>
+  <text x="760" y="246" text-anchor="middle" class="small">= 15 base features</text>
+
+  <!-- Valid month -->
+  <rect x="640" y="280" width="240" height="80" rx="6" class="filter"/>
+  <text x="760" y="302" text-anchor="middle" class="label" font-weight="bold">8. Valid-month filter</text>
+  <text x="760" y="320" text-anchor="middle" class="small">drop pixels with &lt;2 valid months</text>
+  <text x="760" y="334" text-anchor="middle" class="small">(out of Oct/Nov/Dec, after cloud mask)</text>
+  <text x="760" y="350" text-anchor="middle" class="small">cross-month NaN impute for n_valid==2</text>
+
+  <!-- Output -->
+  <rect x="940" y="160" width="220" height="120" rx="8" class="out"/>
+  <text x="1050" y="184" text-anchor="middle" class="label" font-weight="bold">baseline_dataset.parquet</text>
+  <text x="1050" y="206" text-anchor="middle" class="small">~7 M rows × 21 cols</text>
+  <text x="1050" y="222" text-anchor="middle" class="small">label, ndvi 10..swir 12,</text>
+  <text x="1050" y="238" text-anchor="middle" class="small">year, row, col, parcel_id,</text>
+  <text x="1050" y="254" text-anchor="middle" class="small">n_valid_months</text>
+  <text x="1050" y="272" text-anchor="middle" class="small">+ baseline_dataset_meta.json</text>
+
+  <!-- Stats / accounting -->
+  <rect x="940" y="60" width="220" height="80" rx="6" class="meta"/>
+  <text x="1050" y="80" text-anchor="middle" class="label" font-weight="bold">Drop accounting</text>
+  <text x="1050" y="98" text-anchor="middle" class="small">urban / composite / mixed</text>
+  <text x="1050" y="112" text-anchor="middle" class="small">per-class parcel counts</text>
+  <text x="1050" y="126" text-anchor="middle" class="small">cloud px / month</text>
+
+  <!-- Class summary -->
+  <rect x="940" y="310" width="220" height="180" rx="6" class="meta"/>
+  <text x="1050" y="332" text-anchor="middle" class="label" font-weight="bold">15 classes (kept)</text>
+  <text x="950" y="354" class="small">2101 Paddy</text>
+  <text x="950" y="370" class="small">2204 Cassava</text>
+  <text x="950" y="386" class="small">2205 Pineapple</text>
+  <text x="950" y="402" class="small">2302 Rubber</text>
+  <text x="950" y="418" class="small">2303 OilPalm</text>
+  <text x="950" y="434" class="small">2403 Durian</text>
+  <text x="950" y="450" class="small">2404 Rambutan</text>
+  <text x="950" y="466" class="small">2405 Coconut</text>
+  <text x="1060" y="354" class="small">2407 Mango</text>
+  <text x="1060" y="370" class="small">2413 Longan</text>
+  <text x="1060" y="386" class="small">2416 Jackfruit</text>
+  <text x="1060" y="402" class="small">2419 Mangosteen</text>
+  <text x="1060" y="418" class="small">2420 Langsat</text>
+  <text x="1060" y="434" class="small">4201 Reservoir</text>
+  <text x="1060" y="450" class="small">9999 OTHER</text>
+
+  <!-- Legend -->
+  <g transform="translate(20, 540)">
+    <text x="0" y="0" class="label" font-weight="bold">Legend</text>
+    <rect x="0" y="10" width="20" height="14" class="input"/>
+    <text x="28" y="22" class="small">Input data</text>
+    <rect x="100" y="10" width="20" height="14" class="proc"/>
+    <text x="128" y="22" class="small">Processing step</text>
+    <rect x="240" y="10" width="20" height="14" class="filter"/>
+    <text x="268" y="22" class="small">Filter / drop step</text>
+    <rect x="390" y="10" width="20" height="14" class="out"/>
+    <text x="418" y="22" class="small">Output artifact</text>
+    <rect x="540" y="10" width="20" height="14" class="meta"/>
+    <text x="568" y="22" class="small">Metadata / accounting</text>
+  </g>
+
+  <!-- Key invariants -->
+  <g transform="translate(20, 590)">
+    <text x="0" y="0" class="label" font-weight="bold">Key invariants</text>
+    <text x="0" y="20" class="small">• LABEL_MERGE collapses water variants (4101/4103/4202/4102 → 4201) BEFORE drop checks fire</text>
+    <text x="0" y="38" class="small">• Aquaculture ponds (2902/2903/2904/2905) and Eucalyptus (2304) explicitly DROPPED, not piped to OTHER (spectral confusers)</text>
+    <text x="0" y="56" class="small">• Adaptive buffer preserves rare-class small parcels (e.g., Langsat ~27 polygons/year would otherwise vanish under uniform -10m buffer)</text>
+    <text x="0" y="74" class="small">• Two-pass rasterisation guarantees target parcels override OTHER at conflict pixels (prevents minority erosion under blanket smaller-wins rule)</text>
+    <text x="0" y="92" class="small">• MIN_VALID_MONTHS=2 — pixels with &lt;2 cloud-free months dropped (avoids low-quality 1-month imputation)</text>
+  </g>
+
+  <!-- Arrows -->
+  <!-- inputs to AOI -->
+  <path d="M240 90 H320" class="arrow"/>
+  <!-- inputs to label mapping -->
+  <path d="M240 170 H320" class="arrow"/>
+  <path d="M240 245 Q280 245 320 175" class="arrow"/>
+  <!-- AOI -> label mapping (top-down) -->
+  <path d="M440 120 V140" class="arrow"/>
+  <!-- label mapping -> agri-only -->
+  <path d="M440 220 V240" class="arrow"/>
+  <!-- agri-only -> buffer -->
+  <path d="M440 290 V310" class="arrow"/>
+  <!-- buffer -> rasterise -->
+  <path d="M440 370 V390" class="arrow"/>
+  <!-- rasterise -> pixel sampling -->
+  <path d="M560 420 Q600 420 640 100" class="arrow"/>
+  <!-- pixel sampling -> indices -->
+  <path d="M760 140 V160" class="arrow"/>
+  <!-- indices -> valid-month -->
+  <path d="M760 260 V280" class="arrow"/>
+  <!-- valid-month -> output -->
+  <path d="M880 320 Q910 320 940 220" class="arrow"/>
+  <!-- pipeline -> drop accounting -->
+  <path d="M880 100 H940" class="arrow"/>
+</svg>

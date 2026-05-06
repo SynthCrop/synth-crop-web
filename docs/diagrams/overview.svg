@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 280" font-family="Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="arrow3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f2937"/>
+    </marker>
+    <style>
+      .stage  { stroke:#1f2937; stroke-width:2; rx:10; ry:10; }
+      .b1 { fill:#fff7e6; }
+      .b2 { fill:#e0f2fe; }
+      .b3 { fill:#dbeafe; }
+      .b4 { fill:#fef9c3; }
+      .b5 { fill:#dcfce7; }
+      .title  { font-size:20px; font-weight:bold; fill:#111; }
+      .step   { font-size:14px; font-weight:bold; fill:#111; }
+      .small  { font-size:12px; fill:#374151; }
+      .arrow  { stroke:#1f2937; stroke-width:2; fill:none; marker-end:url(#arrow3); }
+    </style>
+  </defs>
+
+  <text x="20" y="32" class="title">Rayong crop classification — end-to-end workflow</text>
+
+  <!-- 5 horizontal stages -->
+  <g>
+    <rect class="stage b1" x="20"  y="70" width="200" height="140"/>
+    <text x="120" y="98" text-anchor="middle" class="step">1. Inputs</text>
+    <text x="120" y="124" text-anchor="middle" class="small">Sentinel-2 L2A</text>
+    <text x="120" y="142" text-anchor="middle" class="small">3 yr × 3 mo</text>
+    <text x="120" y="164" text-anchor="middle" class="small">LDD shapefiles</text>
+    <text x="120" y="180" text-anchor="middle" class="small">+ LUCODE.xls</text>
+  </g>
+  <g>
+    <rect class="stage b2" x="260" y="70" width="200" height="140"/>
+    <text x="360" y="98" text-anchor="middle" class="step">2. Preprocess</text>
+    <text x="360" y="124" text-anchor="middle" class="small">label drop logic</text>
+    <text x="360" y="142" text-anchor="middle" class="small">adaptive buffer</text>
+    <text x="360" y="160" text-anchor="middle" class="small">2-pass rasterise</text>
+    <text x="360" y="178" text-anchor="middle" class="small">cloud / valid filter</text>
+  </g>
+  <g>
+    <rect class="stage b2" x="500" y="70" width="200" height="140"/>
+    <text x="600" y="98" text-anchor="middle" class="step">3. Features</text>
+    <text x="600" y="124" text-anchor="middle" class="small">5 indices × 3 months</text>
+    <text x="600" y="142" text-anchor="middle" class="small">= 15 base feats</text>
+    <text x="600" y="162" text-anchor="middle" class="small">+ 10 temporal deltas</text>
+    <text x="600" y="180" text-anchor="middle" class="small">= 25 total</text>
+  </g>
+  <g>
+    <rect class="stage b3" x="740" y="70" width="200" height="140"/>
+    <text x="840" y="98" text-anchor="middle" class="step">4. Cascade RF</text>
+    <text x="840" y="124" text-anchor="middle" class="small">Stage 1 — base RF</text>
+    <text x="840" y="142" text-anchor="middle" class="small">(15 classes, 300 trees)</text>
+    <text x="840" y="164" text-anchor="middle" class="small">Stage 2 — orchard</text>
+    <text x="840" y="180" text-anchor="middle" class="small">specialist (8 classes)</text>
+  </g>
+  <g>
+    <rect class="stage b5" x="980" y="70" width="200" height="140"/>
+    <text x="1080" y="98" text-anchor="middle" class="step">5. Outputs</text>
+    <text x="1080" y="124" text-anchor="middle" class="small">pixel + parcel CM</text>
+    <text x="1080" y="142" text-anchor="middle" class="small">metrics.json</text>
+    <text x="1080" y="162" text-anchor="middle" class="small">rf_model.joblib</text>
+    <text x="1080" y="180" text-anchor="middle" class="small">→ Streamlit demo</text>
+  </g>
+
+  <!-- arrows between stages -->
+  <path d="M220 140 H260" class="arrow"/>
+  <path d="M460 140 H500" class="arrow"/>
+  <path d="M700 140 H740" class="arrow"/>
+  <path d="M940 140 H980" class="arrow"/>
+
+  <!-- footer notes -->
+  <text x="20" y="245" class="small">Output: 15 classes — 14 target crops + OTHER, at 10 m / pixel, EPSG:32647 (UTM zone 47N), Rayong AOI 6654 × 9178 px (~61 M pixels).</text>
+  <text x="20" y="263" class="small">Notebook: <tspan font-family="monospace">notebooks/rayong_rf_cascade.ipynb</tspan> — eval: pixel-stratified 80/10/10 split, RF random_state=42.</text>
+</svg>
