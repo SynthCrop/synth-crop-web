@@ -259,8 +259,7 @@ if status["files"].get("three_way_compare.csv") or len(available) > 1:
         })
     cmp_df = pd.DataFrame(rows).set_index("method")
     st.dataframe(
-        cmp_df.style.format("{:.4f}")
-              .background_gradient(cmap="Greens", axis=0),
+        cmp_df.style.format("{:.4f}"),
         use_container_width=True,
     )
 
