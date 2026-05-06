@@ -28,6 +28,41 @@ synth_present = status["files"].get("synth_tabsyn.parquet", False)
 df_synth = load_parquet("synth_tabsyn.parquet") if synth_present else None
 corr_syn = load_npy("corr_syn.npy") if status["files"].get("corr_syn.npy", False) else None
 
+#Manually entered metadata - replace with reading from files if available
+crs = "EPSG:4326 (WGS 84)"
+bounds = {"West": 100.8405, "East": 101.8619, "North": 13.5616, "South": 12.5604}
+
+raster_meta = {
+    "10 m": {
+        "Resolution": "10 m",
+        "Width (pixels)": 10980,
+        "Height (pixels)": 10980,
+        "Band Count": 6,
+        "Data Type": "Float32"
+    },
+    "20 m": {
+        "Resolution": "20 m",
+        "Width (pixels)": 5490,
+        "Height (pixels)": 5490,
+        "Band Count": 14,
+        "Data Type": "Float32"
+    },
+    "60 m": {
+        "Resolution": "60 m",
+        "Width (pixels)": 1830,
+        "Height (pixels)": 1830,
+        "Band Count": 15,
+        "Data Type": "Float32"
+    }
+}
+
+vector_meta = {
+    "Geometry Type": "Polygon",
+    "Feature Count": 13,
+    "Landuse Count": 41571
+}
+
+
 FEATURE_COLS = [c for c in df.columns
                 if c not in ("label", "year", "row", "col")]
 
@@ -40,7 +75,41 @@ c4.metric("synth rows", f"{len(df_synth):,}" if df_synth is not None else "—")
 
 st.markdown("---")
 
-# ---- Class distribution -----------------------------------------------------
+st.subheader("Geospatial Metadata")
+
+sc1, sc2 = st.columns([1, 2])
+with sc1:
+    st.metric("**Coordinate Reference System (CRS)**", crs)
+with sc2:
+    st.write("**Bounding Box (Extent):**")
+    bounds_df = pd.DataFrame([bounds])
+    st.dataframe(bounds_df, hide_index=True, use_container_width=True)
+
+st.markdown("---")
+
+sc1, sc2 = st.columns([1, 2])
+with sc1:
+    st.markdown("**Raster Details**")
+with sc2:
+    view_mode = st.selectbox("Select Resolution", options=list(raster_meta.keys()))    
+
+c1, c2, c3, c4, c5 = st.columns(5)
+c1.metric("Resolution", f"{raster_meta[view_mode]['Resolution']}")
+c2.metric("Width (pixels)", str(raster_meta[view_mode]['Width (pixels)']))
+c3.metric("Height (pixels)", str(raster_meta[view_mode]['Height (pixels)']))
+c4.metric("Band Count", f"{raster_meta[view_mode]['Band Count']}")
+c5.metric("Data Type", f"{raster_meta[view_mode]['Data Type']}")
+
+st.markdown("---")
+
+st.markdown("**Shapefile Details**")
+c1, c2, c3 = st.columns(3)
+c1.metric("Geometry", f"{vector_meta['Geometry Type']}")
+c2.metric("Feature Count", str(vector_meta['Feature Count']))
+c3.metric("Landuse Count", str(vector_meta['Landuse Count']))
+
+st.markdown("---")
+
 st.subheader("Class distribution")
 
 real_counts = (df["label"].value_counts()
@@ -69,12 +138,10 @@ fig.update_layout(height=380, xaxis_tickangle=-30,
                   margin=dict(l=10, r=10, t=10, b=10))
 st.plotly_chart(fig, use_container_width=True)
 
-# ---- Feature summary --------------------------------------------------------
 st.subheader("Per-feature summary stats")
 desc = df[FEATURE_COLS].describe().T
 st.dataframe(desc.style.format("{:.3f}"), use_container_width=True)
 
-# ---- Violin per class -------------------------------------------------------
 st.subheader("Per-class feature distribution")
 feat = st.selectbox("feature", FEATURE_COLS, index=0)
 df_plot = df[[feat, "label"]].copy()
@@ -87,7 +154,6 @@ fig2.update_layout(height=420, showlegend=False, xaxis_tickangle=-30,
                    margin=dict(l=10, r=10, t=10, b=10))
 st.plotly_chart(fig2, use_container_width=True)
 
-# ---- Correlation heatmaps ---------------------------------------------------
 st.subheader("Feature correlation")
 
 def corr_fig(matrix: np.ndarray, title: str) -> go.Figure:
