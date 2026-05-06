@@ -62,8 +62,6 @@ try:
         else:
             st.error(f"No file at directory path")
         
-        # --- 1. Apply column renaming and mapping ---
-        # (Checking if 'LU_CODE' exists just in case it was already renamed)
         if 'LU_CODE' in gdf.columns:
             gdf = gdf.rename(columns={
                 'LU_CODE': 'Area Code',
@@ -81,13 +79,12 @@ try:
             }
             gdf['Type'] = gdf['Type'].replace(land_use_mapping)
 
-        # --- 2. Define colors for each Type ---
         color_map = {
-            'Agriculture': '#2ca02c',        # Green
-            'Forest': '#006400',             # Dark Green
-            'Miscellaneous': '#7f7f7f',      # Gray
-            'Urban and Built-up': '#d62728', # Red
-            'Water Body': '#1f77b4'          # Blue
+            'Agriculture': '#2ca02c',        
+            'Forest': '#006400',             
+            'Miscellaneous': '#7f7f7f',      
+            'Urban and Built-up': '#d62728', 
+            'Water Body': '#1f77b4'          
         }
         
         bounds = gdf.total_bounds
@@ -99,12 +96,10 @@ try:
         attribute_columns = gdf.columns.drop(['geometry', 'Area Code']).tolist()
         tooltip_fields = attribute_columns[:4] if attribute_columns else None
 
-        # --- 3. Apply dynamic style function ---
         folium.GeoJson(
             gdf,
             name=f"Spatial Data {selected_year}",
             style_function=lambda feature: {
-                # Look up the color based on the 'Type' property. Default to 'gray' if not found.
                 'fillColor': color_map.get(feature['properties'].get('Type'), 'gray'),
                 'color': 'black',
                 'weight': 1,
@@ -115,7 +110,6 @@ try:
 
         folium.LayerControl().add_to(m)
 
-        # --- 4. Create and add custom HTML Legend ---
         legend_html = '''
         <div style="
             position: fixed; 
@@ -126,11 +120,9 @@ try:
             <b style="color: black;">Land Use Type</b><br>
         '''
         for label, color in color_map.items():
-            # I added color: black to the text line as well just to be perfectly safe
             legend_html += f'<i style="background:{color};width:12px;height:12px;float:left;margin-right:8px;margin-top:4px;"></i><span style="color: black;">{label}</span><br>'
         legend_html += '</div>'
         
-        # Inject the HTML into the map
         m.get_root().html.add_child(folium.Element(legend_html))
 
         st.write(f"### Interactive Map Preview: {selected_year}")
