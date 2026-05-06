@@ -1,7 +1,7 @@
-"""Cached loaders for parquet / raster / json artifacts.
+"""Cached loaders for parquet, raster, and JSON artifacts.
 
-The web app must never touch raw rasters or the full 3 GB CSV — only the
-files in deploy/artifacts/ produced by prepare_artifacts.py.
+The web app reads only files in `deploy/artifacts/` produced by
+`prepare_artifacts.py` and `prepare_basemap.py`.
 """
 from __future__ import annotations
 import json
@@ -21,13 +21,28 @@ REQUIRED_FILES = [
     "metrics.json",
     "confusion.npy",
     "feature_importance.parquet",
-    "rf_model.joblib",
 ]
 
+# rf_model.joblib is optional. The trained RF cascade is large; the deployed
+# app reads pre-computed `preds_<year>.parquet` outputs instead of running
+# live inference.
 OPTIONAL_FILES = [
+    "rf_model.joblib",
     "synth_tabsyn.parquet",
     "corr_syn.npy",
+    "synth_smote.parquet",
+    "corr_smote.npy",
     "grid_meta.json",
+    # SMOTE cascade artifacts (notebooks/crop_smote_rf.ipynb)
+    "metrics_smote.json",
+    "confusion_smote.npy",
+    "feature_importance_smote.parquet",
+    # TabSyn cascade artifacts (notebooks/crop_tabsyn.ipynb)
+    "tabsyn_metrics.json",
+    "tabsyn_confusion.npy",
+    "tabsyn_feature_importance.parquet",
+    # 3-way comparison summary
+    "three_way_compare.csv",
 ]
 
 EXPECTED_FILES = REQUIRED_FILES + OPTIONAL_FILES
@@ -63,7 +78,13 @@ def artifact_status() -> dict[str, Any]:
         except Exception:
             pass
 
-    n_rasters = len(list(d.glob("preds_*.tif")))
+    pred_tif_years = sorted({int(p.stem.split("_")[1])
+                              for p in d.glob("preds_*.tif")
+                              if p.stem.split("_")[1].isdigit()})
+    pred_pq_years  = sorted({int(p.stem.split("_")[1])
+                              for p in d.glob("preds_*.parquet")
+                              if p.stem.split("_")[1].isdigit()})
+    pred_years = sorted(set(pred_tif_years) | set(pred_pq_years))
 
     return {
         "files": files,
@@ -71,7 +92,10 @@ def artifact_status() -> dict[str, Any]:
         "optional_missing": optional_missing,
         "rows": rows,
         "years": years,
-        "n_rasters": n_rasters,
+        "n_rasters": len(pred_tif_years),
+        "n_pred_pq": len(pred_pq_years),
+        "n_pred_years": len(pred_years),
+        "pred_years": pred_years,
     }
 
 
@@ -92,12 +116,17 @@ def load_npy(name: str):
     return np.load(artifacts_dir() / name)
 
 
-@st.cache_resource(show_spinner=False)
-def load_rf_model():
-    import joblib
-    return joblib.load(artifacts_dir() / "rf_model.joblib")
-
-
 @lru_cache(maxsize=8)
 def list_pred_rasters() -> list[Path]:
     return sorted(artifacts_dir().glob("preds_*.tif"))
+
+
+@lru_cache(maxsize=8)
+def list_pred_parquets() -> list[Path]:
+    return sorted(artifacts_dir().glob("preds_*.parquet"))
+
+
+@st.cache_data(show_spinner=False)
+def load_pred_parquet(name: str):
+    import pandas as pd
+    return pd.read_parquet(artifacts_dir() / name)
