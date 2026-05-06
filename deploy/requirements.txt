@@ -10,3 +10,4 @@ shapely>=2.0
 pyogrio>=0.7
 folium>=0.15
 streamlit-folium>=0.18
+matplotlib

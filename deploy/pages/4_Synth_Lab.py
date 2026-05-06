@@ -325,8 +325,7 @@ with tab_dist:
     st.dataframe(
         wass_df.style.format(
             {**{f: "{:.3f}" for f in FEATURE_COLS},
-             "mean W": "{:.3f}", "n_real": "{:,}", "n_synth": "{:,}"})
-        .background_gradient(subset=FEATURE_COLS + ["mean W"], cmap="Reds"),
+             "mean W": "{:.3f}", "n_real": "{:,}", "n_synth": "{:,}"}),
         use_container_width=True, hide_index=True,
     )
     st.caption(
