@@ -55,10 +55,9 @@ MODELS = {
 }
 
 status = artifact_status()
-available = [k for k, m in MODELS.items()
-             if status["files"].get(m["metrics"])
-             and status["files"].get(m["confusion"])
-             and status["files"].get(m["fi"])]
+# Variant is shown if metrics.json exists. CM + FI panels degrade gracefully
+# when their files are missing (older TabSyn export skipped them).
+available = [k for k, m in MODELS.items() if status["files"].get(m["metrics"])]
 
 if not available:
     st.error(
@@ -80,19 +79,33 @@ picked_key = st.radio(
 picked = MODELS[picked_key]
 
 m  = load_json(picked["metrics"])
-cm = load_npy(picked["confusion"])
-fi = load_parquet(picked["fi"])
+cm = load_npy(picked["confusion"])    if status["files"].get(picked["confusion"]) else None
+fi = load_parquet(picked["fi"])       if status["files"].get(picked["fi"])        else None
+
+
+def _flatten_legacy(block: dict) -> dict:
+    """Old TabSyn export: keys are pixel_acc / parcel_acc / pixel_f1_macro / ...
+    Reshape to {acc, kappa, f1_*, parcel_test:{...}}."""
+    pix = {k.removeprefix("pixel_"): v for k, v in block.items() if k.startswith("pixel_")}
+    par = {k.removeprefix("parcel_"): v for k, v in block.items() if k.startswith("parcel_")}
+    out = dict(pix)
+    if par:
+        out["parcel_test"] = par
+    return out
 
 
 def pick_metrics(raw: dict) -> tuple[dict, str]:
-    """Return (metric_block, label). Handles two metrics layouts:
+    """Return (metric_block, label). Handles three metrics layouts:
        - prepare_artifacts.py: {"metrics": {acc, kappa, ...}}
        - notebook export:      {"pixel_test": {acc, kappa, ...}, "parcel_test": {...}}
+       - legacy TabSyn:        {"augmented_cascade": {pixel_acc, parcel_acc, ...}}
     """
     if "metrics" in raw and isinstance(raw["metrics"], dict):
         return raw["metrics"], "test"
     if "pixel_test" in raw:
         return raw["pixel_test"], "pixel test"
+    if "augmented_cascade" in raw and isinstance(raw["augmented_cascade"], dict):
+        return _flatten_legacy(raw["augmented_cascade"]), "pixel test"
     return raw, "test"
 
 
@@ -118,8 +131,9 @@ h2.metric("Cohen's κ",                f"{kappa:.4f}")
 h3.metric("F1 weighted",              f"{f1_w:.4f}")
 h4.metric("F1 macro",                 f"{f1_m:.4f}")
 
-if "parcel_test" in m:
-    p = m["parcel_test"]
+parcel_block = m.get("parcel_test") or metrics.get("parcel_test")
+if parcel_block:
+    p = parcel_block
     pa, pb, pc, pd_ = st.columns(4)
     pa.metric("parcel accuracy",   f"{metric_get(p, 'accuracy', 'acc'):.4f}")
     pb.metric("parcel κ",          f"{metric_get(p, 'kappa'):.4f}")
@@ -199,41 +213,53 @@ st.caption(
     "Toggle row-normalized to compare per-class recall regardless of class size."
 )
 
-mode = st.radio("scale", ["counts", "row-normalized"], horizontal=True,
-                 key=f"cm_mode_{picked_key}")
-row_sums = cm.sum(axis=1, keepdims=True).clip(min=1)
-matrix = cm if mode == "counts" else cm / row_sums
+if cm is None:
+    st.info(
+        f"`{picked['confusion']}` not present for this variant — "
+        "rerun the upstream notebook export cell to generate it."
+    )
+else:
+    mode = st.radio("scale", ["counts", "row-normalized"], horizontal=True,
+                     key=f"cm_mode_{picked_key}")
+    row_sums = cm.sum(axis=1, keepdims=True).clip(min=1)
+    matrix = cm if mode == "counts" else cm / row_sums
 
-text_counts = cm.astype(int)
-fig2 = go.Figure(
-    data=go.Heatmap(
-        z=matrix, x=CLASSES, y=CLASSES,
-        colorscale="Blues",
-        text=text_counts, texttemplate="%{text:,}", textfont={"size": 9},
-        hovertemplate="true: %{y}<br>pred: %{x}<br>"
-                      "count: %{text:,}<extra></extra>",
-    ),
-    layout=dict(height=600, xaxis_tickangle=-30,
-                yaxis_autorange="reversed", xaxis_title="predicted",
-                yaxis_title="true",
-                margin=dict(l=10, r=10, t=10, b=10)),
-)
-st.plotly_chart(fig2, use_container_width=True)
+    text_counts = cm.astype(int)
+    fig2 = go.Figure(
+        data=go.Heatmap(
+            z=matrix, x=CLASSES, y=CLASSES,
+            colorscale="Blues",
+            text=text_counts, texttemplate="%{text:,}", textfont={"size": 9},
+            hovertemplate="true: %{y}<br>pred: %{x}<br>"
+                          "count: %{text:,}<extra></extra>",
+        ),
+        layout=dict(height=600, xaxis_tickangle=-30,
+                    yaxis_autorange="reversed", xaxis_title="predicted",
+                    yaxis_title="true",
+                    margin=dict(l=10, r=10, t=10, b=10)),
+    )
+    st.plotly_chart(fig2, use_container_width=True)
 
 # ---- feature importance ----------------------------------------------------
 st.subheader("Feature importance (RF stage-1)")
 st.caption("Mean decrease in impurity, sorted ascending. Higher = bigger contribution to split decisions.")
-fi_sorted = fi.sort_values("importance", ascending=True)
-fig3 = go.Figure(data=[
-    go.Bar(x=fi_sorted["importance"], y=fi_sorted["feature"],
-           orientation="h", marker_color="#2ca02c",
-           text=[f"{v:.3f}" for v in fi_sorted["importance"]],
-           textposition="outside",
-           hovertemplate="%{y}<br>importance = %{x:.4f}<extra></extra>"),
-])
-fig3.update_layout(height=460, margin=dict(l=10, r=10, t=10, b=10),
-                   xaxis_title="importance")
-st.plotly_chart(fig3, use_container_width=True)
+if fi is None:
+    st.info(
+        f"`{picked['fi']}` not present for this variant — "
+        "rerun the upstream notebook export cell to generate it."
+    )
+else:
+    fi_sorted = fi.sort_values("importance", ascending=True)
+    fig3 = go.Figure(data=[
+        go.Bar(x=fi_sorted["importance"], y=fi_sorted["feature"],
+               orientation="h", marker_color="#2ca02c",
+               text=[f"{v:.3f}" for v in fi_sorted["importance"]],
+               textposition="outside",
+               hovertemplate="%{y}<br>importance = %{x:.4f}<extra></extra>"),
+    ])
+    fig3.update_layout(height=460, margin=dict(l=10, r=10, t=10, b=10),
+                       xaxis_title="importance")
+    st.plotly_chart(fig3, use_container_width=True)
 
 # ---- 3-way comparison ------------------------------------------------------
 if status["files"].get("three_way_compare.csv") or len(available) > 1:
@@ -245,7 +271,7 @@ if status["files"].get("three_way_compare.csv") or len(available) > 1:
         info = MODELS[key]
         raw = load_json(info["metrics"])
         pix, _ = pick_metrics(raw)
-        par = raw.get("parcel_test", {})
+        par = raw.get("parcel_test") or pix.get("parcel_test") or {}
         rows.append({
             "method":             info["label"],
             "pixel acc":          metric_get(pix, "accuracy", "acc"),

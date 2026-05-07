@@ -1,0 +1,58 @@
+{
+  "model_label": "Random Forest 2-stage cascade + TabSyn synthetic minority augmentation",
+  "cascade_stages": "stage-1 base RF (15 cls) + stage-2 tropical-orchard specialist (8 cls)",
+  "rf_params": {
+    "n_estimators": 300,
+    "max_depth": 36,
+    "min_samples_split": 5,
+    "min_samples_leaf": 1,
+    "max_features": "log2",
+    "class_weight": "balanced_subsample",
+    "bootstrap": true,
+    "n_jobs": -1,
+    "random_state": 42
+  },
+  "rf_params_s2": {
+    "n_estimators": 300,
+    "max_depth": 36,
+    "min_samples_split": 5,
+    "min_samples_leaf": 1,
+    "max_features": "log2",
+    "class_weight": "balanced",
+    "bootstrap": true,
+    "n_jobs": -1,
+    "random_state": 42
+  },
+  "tropical_orchards": [
+    2403,
+    2404,
+    2405,
+    2407,
+    2413,
+    2416,
+    2419,
+    2420
+  ],
+  "minority_classes": [
+    9999,
+    2101,
+    2416,
+    2407,
+    2419,
+    2405,
+    2404,
+    2413,
+    2420
+  ],
+  "syn_target_per_class": 200000,
+  "augmented_cascade": {
+    "pixel_acc": 0.5386126788454874,
+    "pixel_kappa": 0.4822600858485431,
+    "pixel_f1_weighted": 0.5329768773510323,
+    "pixel_f1_macro": 0.4390408327207982,
+    "parcel_acc": 0.6195363328140749,
+    "parcel_kappa": 0.5520437756419009,
+    "parcel_f1_weighted": 0.6168621634860026,
+    "parcel_f1_macro": 0.45072412936616374
+  }
+}
