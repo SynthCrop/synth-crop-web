@@ -2,13 +2,18 @@
 
 Color is keyed to LUL2_CODE (broad land-use category): A=agriculture, F=forest,
 M=miscellaneous, U=urban, W=water. Tooltip shows LU_DES_EN, LU_CODE, area in rai.
+Click any parcel to open a modal that compares the same location across all
+available years (2018 / 2020 / 2024).
 """
 from __future__ import annotations
 from pathlib import Path
 
 import folium
 import geopandas as gpd
+import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
+from shapely.geometry import Point
 from streamlit_folium import st_folium
 
 from lib.io import artifact_status, artifacts_dir
@@ -193,7 +198,119 @@ m.get_root().html.add_child(folium.Element(legend_html))
 folium.LayerControl(collapsed=False).add_to(m)
 
 st.write(f"### Interactive map — {year_label}")
-st_folium(m, width=None, height=620, returned_objects=["last_clicked"])
+st.caption(
+    "Click any parcel to open a side-by-side comparison of that location "
+    "across **all three years**."
+)
+map_state = st_folium(m, width=None, height=620,
+                       returned_objects=["last_clicked"])
+
+
+# ---- cross-year compare modal --------------------------------------------
+@st.cache_data(show_spinner=False)
+def _load_year_4326(year_label: str) -> gpd.GeoDataFrame:
+    """Cached loader for the 4326-projected parcel parquet of a given year."""
+    thai = YEAR_TO_THAI[year_label]
+    pq   = artifacts_dir() / year_label / "parquet" / f"LU_RYG_{thai}_v2.parquet"
+    shp  = artifacts_dir() / year_label / f"LU_RYG_{thai}.shp"
+    return load_and_reproject(str(shp), str(pq))
+
+
+def _hit(gdf_year: gpd.GeoDataFrame, pt: Point):
+    cand_idx = list(gdf_year.sindex.query(pt, predicate="intersects"))
+    if not cand_idx:
+        return None
+    cand = gdf_year.iloc[cand_idx]
+    hits = cand[cand.geometry.contains(pt)]
+    return hits.iloc[0] if len(hits) else None
+
+
+@st.dialog("Parcel comparison — across years", width="large")
+def show_compare(lat: float, lng: float):
+    pt = Point(lng, lat)
+    rows = {y: _hit(_load_year_4326(y), pt) for y in YEAR_TO_THAI}
+
+    st.caption(f"Click point: **{lat:.5f}, {lng:.5f}**")
+
+    cols = st.columns(len(YEAR_TO_THAI))
+    classes_seen: list[str] = []
+    cats_seen: list[str]    = []
+    areas: list[tuple[str, float]] = []
+    for col, (y, row) in zip(cols, rows.items()):
+        thai = YEAR_TO_THAI[y]
+        col.markdown(f"#### {y}  <span style='color:#888;font-size:13px;'>"
+                      f"({thai} BE)</span>", unsafe_allow_html=True)
+        if row is None:
+            col.warning("No parcel covers this point in this year.")
+            areas.append((y, 0.0))
+            continue
+        cls = str(row.get("LU_DES_EN", "—"))
+        lu  = str(row.get("LU_CODE", "—"))
+        cat = str(row.get("LUL2_CODE", "—"))
+        rai = float(row.get("Area_Rai", float("nan"))) if "Area_Rai" in row else float("nan")
+        col.metric("class (LU_DES_EN)", cls)
+        col.metric("LU_CODE",           lu)
+        col.metric("LUL2_CODE",         cat)
+        col.metric("area (rai)",        f"{rai:,.2f}" if rai == rai else "—")
+        cat_color = CATEGORY_COLOR.get(cat[:1], "#888888")
+        col.markdown(
+            f"<span style='display:inline-block;width:14px;height:14px;"
+            f"background:{cat_color};border-radius:3px;border:1px solid #333;"
+            f"vertical-align:middle;margin-right:6px;'></span>"
+            f"<span style='font-size:13px;color:#aaa;'>"
+            f"{CATEGORY_NAME.get(cat[:1], 'Unknown')}</span>",
+            unsafe_allow_html=True,
+        )
+        classes_seen.append(cls)
+        cats_seen.append(cat[:1])
+        areas.append((y, rai if rai == rai else 0.0))
+
+    distinct_classes = {c for c in classes_seen if c}
+    distinct_cats    = {c for c in cats_seen if c}
+    if len(distinct_classes) > 1:
+        st.warning(
+            f"Class **changed** across years: "
+            + " → ".join(c if c else "—" for c in classes_seen)
+        )
+    elif distinct_classes:
+        st.success(f"Class stable across years: **{next(iter(distinct_classes))}**.")
+
+    if len(distinct_cats) > 1:
+        st.info(
+            "Broad category (LUL2) shifted: "
+            + " → ".join(f"{c} ({CATEGORY_NAME.get(c, '?')})" if c else "—"
+                          for c in cats_seen)
+        )
+
+    # area-over-time bar
+    if any(a for _, a in areas):
+        fig = go.Figure(data=[
+            go.Bar(x=[y for y, _ in areas],
+                    y=[a for _, a in areas],
+                    marker_color="#2ca02c",
+                    text=[f"{a:,.1f}" for _, a in areas],
+                    textposition="outside",
+                    hovertemplate="%{x}<br>area = %{y:,.2f} rai<extra></extra>"),
+        ])
+        fig.update_layout(
+            height=260, yaxis_title="area (rai)",
+            margin=dict(l=10, r=10, t=10, b=10),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+
+# auto-trigger on a fresh click; track last shown to avoid re-opening the
+# modal on every rerun for the same click point.
+click = (map_state or {}).get("last_clicked")
+if click:
+    cur = (round(click["lat"], 6), round(click["lng"], 6))
+    last = st.session_state.get("temporal_last_click")
+    if cur != last:
+        st.session_state["temporal_last_click"] = cur
+        show_compare(click["lat"], click["lng"])
+
+    if st.button("🔁 Re-open comparison for last click"):
+        show_compare(click["lat"], click["lng"])
 
 # ---- per-category breakdown ----------------------------------------------
 if "LUL2_CODE" in gdf.columns and "Area_Rai" in gdf.columns:

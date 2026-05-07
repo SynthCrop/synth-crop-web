@@ -13,7 +13,7 @@ tropical-orchard specialist). AOI: Rayong, Thailand. Years: 2018, 2020, 2024
 | # | Page | Reads |
 |---|---|---|
 | 1 | **Dataset** — class distribution, per-feature stats, real-vs-synth correlation | `dataset.parquet`, `class_counts.parquet`, `feature_stats.parquet`, `corr_real.npy`, `corr_syn.npy`, `synth_tabsyn.parquet` |
-| 2 | **Temporal Change** — per-year landuse polygons over a folium basemap | `<year>/LU_RYG_<thai>.{shp,shx,dbf,prj,cpg}` |
+| 2 | **Temporal Change** — per-year landuse polygons over a folium basemap; click any parcel to open a modal that compares the same point across all three years | `<year>/LU_RYG_<thai>.{shp,shx,dbf,prj,cpg}` for every available year |
 | 3 | **Segmentation** — Sentinel-2 basemap with RF prediction overlay; click a parcel to compare per-pixel predictions to the ground truth | `preds_<year>.parquet`, `grid_meta.json`, `basemap_<year>.{jpg,json}`, `preds_<year>.png`, `<year>/LU_RYG_<thai>.shp` |
 | 4 | **Synth Lab** — TabSyn / SMOTE quality (class lift, marginals, PCA, Wasserstein, correlation drift) | `dataset.parquet`, `synth_tabsyn.parquet`, `synth_smote.parquet`, `corr_real.npy`, `corr_syn.npy`, `corr_smote.npy` |
 | 5 | **Model Card** — variant selector + side-by-side comparison (baseline / SMOTE / TabSyn): hyperparameters, per-class F1, confusion matrix, feature importance | `metrics.json`, `confusion.npy`, `feature_importance.parquet`, `metrics_smote.json` *(opt)*, `confusion_smote.npy` *(opt)*, `feature_importance_smote.parquet` *(opt)*, `tabsyn_metrics.json` *(opt)*, `tabsyn_confusion.npy` *(opt)*, `tabsyn_feature_importance.parquet` *(opt)*, `three_way_compare.csv` *(opt)* |
